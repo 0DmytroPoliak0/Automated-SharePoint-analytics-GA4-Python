@@ -1,0 +1,135 @@
+Pulse GA4 – Automated “Pages & Screens” Monthly Report
+======================================================
+
+This package downloads the GA4 “Pages and screens” report for the previous full calendar month,
+sorts by Views (Pageviews), trims columns to match the team SOP, and saves a ready-to-share Excel file
+(autofilter + frozen header + adjusted column widths). It can also write a CSV.
+
+--------------------------------------------------------------------------------
+CONTENTS
+--------------------------------------------------------------------------------
+- ga4_pages_and_screens_prev_month.py  -> main automation script
+- README.txt                           -> this guide
+- run-ga4.ps1                          -> PowerShell one-click launcher (Windows)
+- run-ga4.bat                          -> CMD one-click launcher (Windows)
+
+--------------------------------------------------------------------------------
+PREREQUISITES
+--------------------------------------------------------------------------------
+1) Python
+   - Install Python 3.8+ (https://www.python.org/downloads/)
+   - Open PowerShell/CMD and install dependencies:
+       pip install google-analytics-data pandas openpyxl
+   - (Optional) If you prefer XlsxWriter as the Excel engine:
+       pip install XlsxWriter
+     (Referenced in the internal GA4 user guide.)
+
+2) GA4 Access Model (choose ONE authentication method)
+   - A) Service Account (recommended for unattended automation)
+   - B) Application Default Credentials (ADC) with gcloud (from internal guide)
+
+--------------------------------------------------------------------------------
+AUTHENTICATION (CHOOSE ONE)
+--------------------------------------------------------------------------------
+A) Service Account (RECOMMENDED for automation)
+   1. In Google Cloud Console, create a Service Account and download its JSON key.
+   2. In GA4 Admin (Property > Access management), add the service account email with Viewer/Analyst access.
+   3. In the terminal you use to run the script, set:
+        PowerShell:
+          $env:GOOGLE_APPLICATION_CREDENTIALS="C:\path\to\ga4-service-account.json"
+        CMD:
+          set GOOGLE_APPLICATION_CREDENTIALS=C:\path\to\ga4-service-account.json
+        macOS/Linux:
+          export GOOGLE_APPLICATION_CREDENTIALS="/Users/you/ga4-service-account.json"
+
+B) Application Default Credentials (ADC) via gcloud (internal guide)
+   1. Authenticate with required scopes:
+        gcloud auth application-default login --scopes="https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/analytics.readonly"
+   2. Set your quota project:
+        gcloud auth application-default set-quota-project reportautomation-1754438286553
+   3. Ensure the “Analytics Data API” is enabled for that project:
+      - https://console.cloud.google.com/apis/library/analyticsdata.googleapis.com
+      - Select the same project (reportautomation-1754438286553) and click Enable
+
+   Tip: The provided launchers here use your ADC file path:
+        C:\Users\dpoliak\AppData\Roaming\gcloud\application_default_credentials.json
+   (Adjust if your path differs.)
+
+--------------------------------------------------------------------------------
+CONFIGURATION
+--------------------------------------------------------------------------------
+1) Property ID
+   - In the script, set:
+       PROPERTY_ID = "351122778"
+     (Update if you need to run for a different property.)
+
+2) Stream/Platform Filtering
+   - The script filters to platform = "Web". If your property has multiple streams, you can instead
+     filter by streamName or streamId (commented examples are in the script).
+
+3) Output naming
+   - Files are saved in the current folder as:
+       Pulse-all-pages-report-YYYYMMDD-YYYYMMDD.xlsx
+     (Optional CSV uses the same base name: .csv)
+
+--------------------------------------------------------------------------------
+RUN
+--------------------------------------------------------------------------------
+Option 1 — One click (PowerShell):
+   - Right-click `run-ga4.ps1` > Run with PowerShell
+   (Or in PowerShell:  .\run-ga4.ps1 )
+
+Option 2 — One click (CMD):
+   - Double-click `run-ga4.bat`
+   (Or in CMD:  run-ga4.bat )
+
+Option 3 — Manual:
+   - Open a terminal in the script folder and run:
+       python ga4_pages_and_screens_prev_month.py
+
+On success, you’ll see:
+  Saved: Pulse-all-pages-report-YYYYMMDD-YYYYMMDD.xlsx
+  Date range: YYYY-MM-DD to YYYY-MM-DD
+
+--------------------------------------------------------------------------------
+WHAT THE SCRIPT DOES (Summary)
+--------------------------------------------------------------------------------
+- Queries GA4 Data API for previous full month with:
+  - Dimension: pagePath (web; maps to UI “Page path and screen class”)
+  - Metrics: screenPageViews (UI “Views”), activeUsers, userEngagementDuration, eventCount, keyEvents, totalRevenue
+- Computes:
+  - Views per active user = screenPageViews / activeUsers
+  - Average engagement time per active user (sec) = userEngagementDuration / activeUsers
+- Sorts by Views (desc), trims the last two columns (Key events, Total revenue)
+- Writes a formatted Excel file (autofilter, frozen top row, adjusted column widths)
+
+--------------------------------------------------------------------------------
+TROUBLESHOOTING
+--------------------------------------------------------------------------------
+- PermissionError: [Errno 13] Permission denied: 'Pulse-all-pages-report-...csv/xlsx'
+  Close the file in Excel; OneDrive sync can also briefly lock files.
+
+- INVALID_ARGUMENT (e.g., “screenClass not valid”):
+  Use `pagePath` for web; the UI label “Page path and screen class” is context-aware in GA4 UI.
+
+- INVALID_ARGUMENT (e.g., “dataStreamType not valid”):
+  Filter by platform = "Web", or by streamName/streamId.
+
+- Numbers don’t match GA4 UI:
+  Verify PROPERTY_ID is correct (most common cause), date range (previous calendar month),
+  and that you aren’t excluding the main stream.
+
+- Auth/Access errors (401/403):
+  Service account missing GA4 property access, or ADC not initialized for the correct project/scopes.
+  Re-run the gcloud ADC steps if needed.
+
+--------------------------------------------------------------------------------
+MAINTENANCE & SECURITY
+--------------------------------------------------------------------------------
+- Don’t commit JSON keys to version control; rotate keys when people leave.
+- Keep deps current:
+    pip install --upgrade google-analytics-data pandas openpyxl
+- If project or property changes, update:
+  - PROPERTY_ID
+  - Any stream filter
+  - gcloud quota project (ADC)
